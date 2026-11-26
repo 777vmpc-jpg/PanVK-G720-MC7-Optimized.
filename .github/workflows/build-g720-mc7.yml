@@ -2,6 +2,12 @@ name: Build PanVK G720 MC7 test package
 
 on:
   workflow_dispatch:
+  push:
+    branches: [port/faux123-1.1.9-g720-mc7]
+    paths:
+      - .github/workflows/build-g720-mc7.yml
+      - SOURCES.lock.json
+      - PORTING/**
 
 permissions:
   contents: read
