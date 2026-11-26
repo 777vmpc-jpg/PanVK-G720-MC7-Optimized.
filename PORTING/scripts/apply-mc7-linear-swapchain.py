@@ -105,7 +105,8 @@ anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, 
        !(pCreateInfo->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) ||
        (((uint64_t)native_buffer->usage & cpu_usage) != cpu_usage) ||
        pCreateInfo->extent.depth != 1 || pCreateInfo->arrayLayers != 1 ||
-       native_buffer->stride < pCreateInfo->extent.width ||
+       native_buffer->stride <= 0 ||
+       (uint32_t)native_buffer->stride < pCreateInfo->extent.width ||
        max_planes < 1)
       return result;
 
