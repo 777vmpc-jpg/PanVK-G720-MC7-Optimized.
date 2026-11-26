@@ -32,7 +32,7 @@ jobs:
             readelf -d "$f" > "work/inspection/${name}.elf-dynamic.txt" || true
             readelf -Ws "$f" > "work/inspection/${name}.symbols.txt" || true
           done
-          cp work/panvk_faux123_v1.1.9.adpkg.zip work/
+          cp work/panvk_faux123_v1.1.9.adpkg.zip work/inspection/source-package.zip
           tar -czf faux123-panvk-1.1.9-recovered.tar.gz -C work package inspection
       - name: Upload recovered package and inspection
         uses: actions/upload-artifact@v4
