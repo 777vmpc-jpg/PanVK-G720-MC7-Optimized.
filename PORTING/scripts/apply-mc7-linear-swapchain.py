@@ -98,9 +98,8 @@ replace_once(vk_android_c,
     'static struct u_gralloc *_gralloc;\n',
     helpers)
 
-anb_old = """   return vk_gralloc_to_drm_explicit_layout(&gr_handle, out,
-                                            out_layouts, max_planes);
-}"""
+anb_old = """return vk_gralloc_to_drm_explicit_layout(&gr_handle, out,
+                                             out_layouts, max_planes);"""
 anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, out,
                                                         out_layouts, max_planes);
    if (result != VK_SUCCESS ||
@@ -112,9 +111,7 @@ anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, 
       AHARDWAREBUFFER_USAGE_CPU_READ_RARELY |
       AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY;
 
-   /* Only override an unknown layout for the exact fallback-gralloc case
-    * demonstrated by the MT6899 report: RGBA8888 color target, CPU-usable
-    * swapchain buffer, and a linear request from the MediaTek rule. */
+   /* Restrict the fallback to the reported MTK RGBA8888 color-target case. */
    if (!vk_android_cpu_usable_swapchain_requested ||
        !vk_android_swapchain_cpu_usage(pCreateInfo->format, pCreateInfo->usage) ||
        no_linear_fix ||
@@ -125,7 +122,7 @@ anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, 
        pCreateInfo->extent.depth != 1 || pCreateInfo->arrayLayers != 1 ||
        native_buffer->stride <= 0 ||
        (uint32_t)native_buffer->stride < pCreateInfo->extent.width ||
-       max_planes < 1)
+       !out_layouts || max_planes < 1)
       return result;
 
    const uint64_t row_pitch = (uint64_t)native_buffer->stride * 4;
@@ -152,7 +149,7 @@ anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, 
              (unsigned long long)row_pitch);
 
    return VK_SUCCESS;
-}"""
+"""
 replace_in_function(vk_android_c, "vk_android_get_anb_layout(", anb_old, anb_new)
 
 usage2_old = """   /* for front buffer rendering */
