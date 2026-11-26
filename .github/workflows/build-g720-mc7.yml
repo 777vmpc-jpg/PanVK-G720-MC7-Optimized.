@@ -101,6 +101,14 @@ jobs:
           git diff --stat
           grep -n 'panvk-wsi-diag:' src/panfrost/vulkan/panvk_wsi.c
 
+      - name: Port Faux123 1.1.9 MediaTek linear AHB rule
+        run: |
+          set -euo pipefail
+          python3 PORTING/scripts/apply-mc7-linear-swapchain.py
+          cd source/work/mesa
+          git diff --check
+          grep -n -E 'vk_android_swapchain_cpu_usage|AHB usage query|vk_android_request_linear_swapchain' src/vulkan/runtime/vk_android.c src/panfrost/vulkan/panvk_physical_device.c
+
       - name: Build Android ARM64 Vulkan ICD
         env:
           PANVK_JOBS: 2
@@ -121,16 +129,17 @@ jobs:
           {
             "schemaVersion": 1,
             "name": "PanVK G720 MC7 public-source port (test build)",
-            "description": "Experimental Android Kbase/CSF build from pinned public Mesa and patch sources. Not hardware-validated for BOTWRecomp.",
+            "description": "Experimental Android Kbase/CSF port from pinned Mesa and public patches, with the MediaTek linear-AHB usage behavior reconstructed from Faux123 1.1.9. Not byte-identical to Faux123 and not hardware-validated for BOTWRecomp.",
             "author": "Mesa/Panfrost contributors and public patch authors; see source provenance",
-            "packageVersion": "0.1.0-mc7-test",
+            "packageVersion": "0.1.1-mc7-mtk-linear-ahb",
             "vendor": "Mesa",
-            "driverVersion": "26.3.1-devel-port",
+            "driverVersion": "26.3.0-devel-port",
             "minApi": 29,
             "libraryName": "libvulkan_panfrost.so"
           }
           EOF
-          (cd dist/package && zip -q -9 -r ../PanVK-G720-MC7-test.adpkg.zip .)
+          (cd dist/package && zip -q -9 -r ../PanVK-G720-MC7-test.adpkg .)
+          cp dist/PanVK-G720-MC7-test.adpkg dist/PanVK-G720-MC7-test.adpkg.zip
           sha256sum dist/PanVK-G720-MC7-test.adpkg.zip dist/package/libvulkan_panfrost.so | tee dist/SHA256SUMS
           cp source/work/mesa/.git/HEAD dist/mesa-head.txt || true
 
