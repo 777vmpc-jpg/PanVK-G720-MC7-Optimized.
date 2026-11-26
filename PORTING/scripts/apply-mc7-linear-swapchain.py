@@ -87,7 +87,6 @@ anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, 
        out->drmFormatModifier != DRM_FORMAT_MOD_INVALID)
       return result;
 
-   struct u_gralloc *gralloc = vk_android_get_ugralloc();
    const char *no_linear_fix = os_get_option("PANVK_ANB_NO_LINEAR_FIX");
    const uint64_t cpu_usage =
       AHARDWAREBUFFER_USAGE_CPU_READ_RARELY |
@@ -98,7 +97,6 @@ anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, 
     * swapchain buffer, and a linear request from the MediaTek rule. */
    if (!vk_android_cpu_usable_swapchain_requested ||
        !vk_android_swapchain_cpu_usage(pCreateInfo->format, pCreateInfo->usage) ||
-       !gralloc || u_gralloc_get_type(gralloc) != U_GRALLOC_TYPE_FALLBACK ||
        no_linear_fix ||
        pCreateInfo->format != VK_FORMAT_R8G8B8A8_UNORM ||
        native_buffer->format != HAL_PIXEL_FORMAT_RGBA_8888 ||
