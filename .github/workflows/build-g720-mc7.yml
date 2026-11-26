@@ -64,12 +64,12 @@ jobs:
           git clone https://github.com/zenithblue-oss/panvk-kbase-android.git source
           cd source
           git checkout cf70e02b918e1864cbcd746a7fefa57b96c673ce
-          ./scripts/fetch-mesa.sh
+          bash ./scripts/fetch-mesa.sh
 
       - name: Apply pinned public Kbase/CSF patch series strictly
         run: |
           cd source
-          ./scripts/prepare-rc5-tree.sh --mesa "$PWD/work/mesa" --csf-max 233 --wip-max 0175
+          bash ./scripts/prepare-rc5-tree.sh --mesa "$PWD/work/mesa" --csf-max 233 --wip-max 0175
 
       - name: Build Android ARM64 Vulkan ICD
         env:
@@ -77,7 +77,7 @@ jobs:
           ANDROID_API: 29
         run: |
           cd source
-          MESA="$PWD/work/mesa" ./scripts/build-android.sh --profile g720-v12-csf --api 29 --ndk "$ANDROID_NDK_ROOT"
+          MESA="$PWD/work/mesa" bash ./scripts/build-android.sh --profile g720-v12-csf --api 29 --ndk "$ANDROID_NDK_ROOT"
 
       - name: Verify ELF and generate package
         run: |
