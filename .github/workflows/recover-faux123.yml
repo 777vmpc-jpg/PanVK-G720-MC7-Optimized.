@@ -1,0 +1,46 @@
+name: Recover Faux123 PanVK 1.1.9
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/recover-faux123.yml
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download official release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/package work/inspection
+          curl -fL --retry 3 --retry-delay 2 \
+            "https://github.com/faux123/panvk-faux123-driver-rp4pro/releases/download/v1.1.9/panvk_faux123_v1.1.9.adpkg.zip" \
+            -o work/panvk_faux123_v1.1.9.adpkg.zip
+          echo "b611ea3217b28b8e965cd6ecfc622f0fef59f00c19ea1b417092e13c23038630  work/panvk_faux123_v1.1.9.adpkg.zip" | sha256sum -c -
+          unzip -q work/panvk_faux123_v1.1.9.adpkg.zip -d work/package
+          find work/package -type f -printf '%P\t%s bytes\n' | sort > work/inspection/files.txt
+          find work/package -type f -exec sha256sum {} \; > work/inspection/sha256.txt
+          find work/package -type f \( -name '*.so' -o -name '*.so.*' \) -print0 | while IFS= read -r -d '' f; do
+            name="$(basename "$f")"
+            readelf -h "$f" > "work/inspection/${name}.elf-header.txt" || true
+            readelf -d "$f" > "work/inspection/${name}.elf-dynamic.txt" || true
+            readelf -Ws "$f" > "work/inspection/${name}.symbols.txt" || true
+          done
+          cp work/panvk_faux123_v1.1.9.adpkg.zip work/
+          tar -czf faux123-panvk-1.1.9-recovered.tar.gz -C work package inspection
+      - name: Upload recovered package and inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: faux123-panvk-1.1.9-recovered
+          path: |
+            work/panvk_faux123_v1.1.9.adpkg.zip
+            faux123-panvk-1.1.9-recovered.tar.gz
+            work/inspection/**
+          if-no-files-found: error
+          retention-days: 14
