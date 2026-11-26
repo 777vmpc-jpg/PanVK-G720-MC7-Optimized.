@@ -78,6 +78,64 @@ replace_once(vk_android_c,
     'static struct u_gralloc *_gralloc;\n',
     helpers)
 
+anb_old = """   return vk_gralloc_to_drm_explicit_layout(&gr_handle, out,
+                                            out_layouts, max_planes);
+}"""
+anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, out,
+                                                        out_layouts, max_planes);
+   if (result != VK_SUCCESS ||
+       out->drmFormatModifier != DRM_FORMAT_MOD_INVALID)
+      return result;
+
+   struct u_gralloc *gralloc = vk_android_get_ugralloc();
+   const char *no_linear_fix = os_get_option("PANVK_ANB_NO_LINEAR_FIX");
+   const uint64_t cpu_usage =
+      AHARDWAREBUFFER_USAGE_CPU_READ_RARELY |
+      AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY;
+
+   /* Only override an unknown layout for the exact fallback-gralloc case
+    * demonstrated by the MT6899 report: RGBA8888 color target, CPU-usable
+    * swapchain buffer, and a linear request from the MediaTek rule. */
+   if (!vk_android_cpu_usable_swapchain_requested ||
+       !vk_android_swapchain_cpu_usage(pCreateInfo->format, pCreateInfo->usage) ||
+       !gralloc || u_gralloc_get_type(gralloc) != U_GRALLOC_TYPE_FALLBACK ||
+       no_linear_fix ||
+       pCreateInfo->format != VK_FORMAT_R8G8B8A8_UNORM ||
+       native_buffer->format != HAL_PIXEL_FORMAT_RGBA_8888 ||
+       !(pCreateInfo->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) ||
+       (((uint64_t)native_buffer->usage & cpu_usage) != cpu_usage) ||
+       pCreateInfo->extent.depth != 1 || pCreateInfo->arrayLayers != 1 ||
+       native_buffer->stride < pCreateInfo->extent.width ||
+       max_planes < 1)
+      return result;
+
+   const uint64_t row_pitch = (uint64_t)native_buffer->stride * 4;
+   if (pCreateInfo->extent.height &&
+       row_pitch > UINT64_MAX / pCreateInfo->extent.height)
+      return result;
+
+   const uint64_t size = row_pitch * pCreateInfo->extent.height;
+   out->drmFormatModifier = DRM_FORMAT_MOD_LINEAR;
+   out->drmFormatModifierPlaneCount = 1;
+   out->pPlaneLayouts = out_layouts;
+   out_layouts[0] = (VkSubresourceLayout) {
+      .offset = 0,
+      .size = size,
+      .rowPitch = row_pitch,
+      .arrayPitch = size,
+      .depthPitch = size,
+   };
+
+   mesa_logi("[swapchain] swapchain buffer %ux%u vkformat %u hal %d stride %d usage 0x%llx gralloc fallback linear-forced 1 -> result 0 modifier 0x0 plane0 offset 0 pitch %llu",
+             pCreateInfo->extent.width, pCreateInfo->extent.height,
+             pCreateInfo->format, native_buffer->format,
+             native_buffer->stride, (unsigned long long)native_buffer->usage,
+             (unsigned long long)row_pitch);
+
+   return VK_SUCCESS;
+}"""
+replace_once(vk_android_c, anb_old, anb_new)
+
 usage2_old = """   /* for front buffer rendering */
    if (swapchainImageUsage & VK_SWAPCHAIN_IMAGE_USAGE_SHARED_BIT_ANDROID)
       *grallocProducerUsage |= vk_android_get_front_buffer_usage();
