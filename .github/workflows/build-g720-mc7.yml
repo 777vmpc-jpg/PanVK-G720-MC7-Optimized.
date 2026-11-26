@@ -81,6 +81,15 @@ jobs:
           git config --global user.email "panvk-ci@users.noreply.github.com"
           bash ./scripts/prepare-rc5-tree.sh --mesa "$PWD/work/mesa" --csf-max 233 --wip-max 0175
 
+      - name: Add Android WSI failure-stage diagnostics
+        run: |
+          set -euo pipefail
+          cd source/work/mesa
+          git apply --check "$GITHUB_WORKSPACE/PORTING/patches/diagnose-android-wsi.patch"
+          git apply "$GITHUB_WORKSPACE/PORTING/patches/diagnose-android-wsi.patch"
+          git diff --check
+          git diff --stat
+
       - name: Build Android ARM64 Vulkan ICD
         env:
           PANVK_JOBS: 2
