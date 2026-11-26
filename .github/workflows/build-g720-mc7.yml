@@ -95,11 +95,11 @@ jobs:
       - name: Add Android WSI failure-stage diagnostics
         run: |
           set -euo pipefail
+          python3 PORTING/scripts/instrument-android-wsi.py
           cd source/work/mesa
-          git apply --check "$GITHUB_WORKSPACE/PORTING/patches/diagnose-android-wsi.patch"
-          git apply "$GITHUB_WORKSPACE/PORTING/patches/diagnose-android-wsi.patch"
           git diff --check
           git diff --stat
+          grep -n 'panvk-wsi-diag:' src/panfrost/vulkan/panvk_wsi.c
 
       - name: Build Android ARM64 Vulkan ICD
         env:
