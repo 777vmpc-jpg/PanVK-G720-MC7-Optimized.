@@ -87,8 +87,8 @@ jobs:
           cd source/work/mesa
           echo '=== WSI symbols and Android buffer calls ==='
           grep -n -E 'AHardwareBuffer_allocate|CreateImage|GetAndroidHardwareBufferPropertiesANDROID|AllocateMemory|BindImageMemory2|panvk_android_swapchain|mesa_logi|mesa_logi' src/panfrost/vulkan/panvk_wsi.c || true
-          echo '=== WSI source lines 250-520 ==='
-          sed -n '250,520p' src/panfrost/vulkan/panvk_wsi.c
+          echo '=== Exact swapchain creation source lines 550-670 ==='
+          sed -n '550,670p' src/panfrost/vulkan/panvk_wsi.c
           echo '=== logging macro availability ==='
           grep -R -n -m 8 'define mesa_logi\|mesa_logi(' src/panfrost/vulkan | head -30 || true
 
