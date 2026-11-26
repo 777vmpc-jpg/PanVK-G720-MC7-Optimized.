@@ -31,7 +31,7 @@ jobs:
             libwayland-dev wayland-protocols libx11-dev libxcb1-dev \
             libxcb-randr0-dev libxcb-xfixes0-dev libxcb-sync-dev \
             libxcb-present-dev libxshmfence-dev libxml2-dev libllvmspirvlib-18-dev \
-            spirv-tools libspirv-tools-dev libudev-dev
+            spirv-tools libudev-dev
 
       - name: Upgrade Meson for pinned Mesa source
         run: |
