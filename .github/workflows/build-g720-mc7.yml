@@ -28,6 +28,7 @@ jobs:
             python3 python3-pip python3-mako python3-yaml python3-setuptools \
             meson ninja-build flex bison cmake build-essential clang llvm \
             libexpat1-dev libzstd-dev zlib1g-dev libdrm-dev libelf-dev \
+            llvm-18-dev clang-18 libclang-18-dev libclang-cpp18-dev libdisplay-info-dev \
             libwayland-dev wayland-protocols libx11-dev libxcb1-dev \
             libxcb-randr0-dev libxcb-xfixes0-dev libxcb-sync-dev \
             libxcb-present-dev libxshmfence-dev libxml2-dev libllvmspirvlib-18-dev \
