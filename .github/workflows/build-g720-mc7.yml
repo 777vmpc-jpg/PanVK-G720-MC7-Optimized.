@@ -1,4 +1,5 @@
 name: Build PanVK G720 MC7 test package
+# Rebuild after correcting the pinned Mesa ANB-layout patch anchor.
 
 on:
   workflow_dispatch:
