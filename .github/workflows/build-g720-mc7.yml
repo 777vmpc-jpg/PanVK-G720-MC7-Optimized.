@@ -1,0 +1,90 @@
+name: Build PanVK G720 MC7 test package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Checkout port repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git curl wget unzip zip xz-utils pkg-config \
+            python3 python3-pip python3-mako python3-yaml python3-setuptools \
+            meson ninja-build flex bison cmake build-essential clang llvm \
+            libexpat1-dev libzstd-dev zlib1g-dev libdrm-dev libelf-dev \
+            libwayland-dev wayland-protocols libx11-dev libxcb1-dev \
+            libxcb-randr0-dev libxcb-xfixes0-dev libxcb-sync-dev \
+            libxcb-present-dev libxshmfence-dev libxml2-dev
+
+      - name: Install Android NDK
+        uses: android-actions/setup-android@v3
+      - name: Install pinned NDK
+        run: |
+          sdkmanager "ndk;27.3.13750724"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.3.13750724" >> "$GITHUB_ENV"
+
+      - name: Fetch exact Mesa source
+        run: |
+          git clone https://github.com/zenithblue-oss/panvk-kbase-android.git source
+          cd source
+          git checkout cf70e02b918e1864cbcd746a7fefa57b96c673ce
+          ./scripts/fetch-mesa.sh
+
+      - name: Apply pinned public Kbase/CSF patch series strictly
+        run: |
+          cd source
+          ./scripts/prepare-rc5-tree.sh --mesa "$PWD/work/mesa" --csf-max 233 --wip-max 0175
+
+      - name: Build Android ARM64 Vulkan ICD
+        env:
+          PANVK_JOBS: 2
+          ANDROID_API: 29
+        run: |
+          cd source
+          MESA="$PWD/work/mesa" ./scripts/build-android.sh --profile g720-v12-csf --api 29 --ndk "$ANDROID_NDK_ROOT"
+
+      - name: Verify ELF and generate package
+        run: |
+          set -euo pipefail
+          mkdir -p dist/package
+          cp source/dist/android-g720-v12-csf/libvulkan_panfrost.so dist/package/
+          llvm-readelf -h dist/package/libvulkan_panfrost.so | tee dist/elf-header.txt
+          llvm-readelf -d dist/package/libvulkan_panfrost.so | tee dist/elf-dynamic.txt
+          grep -q 'AArch64' dist/elf-header.txt
+          cat > dist/package/meta.json <<'EOF'
+          {
+            "schemaVersion": 1,
+            "name": "PanVK G720 MC7 public-source port (test build)",
+            "description": "Experimental Android Kbase/CSF build from pinned public Mesa and patch sources. Not hardware-validated for BOTWRecomp.",
+            "author": "Mesa/Panfrost contributors and public patch authors; see source provenance",
+            "packageVersion": "0.1.0-mc7-test",
+            "vendor": "Mesa",
+            "driverVersion": "26.3.1-devel-port",
+            "minApi": 29,
+            "libraryName": "libvulkan_panfrost.so"
+          }
+          EOF
+          (cd dist/package && zip -q -9 -r ../PanVK-G720-MC7-test.adpkg.zip .)
+          sha256sum dist/PanVK-G720-MC7-test.adpkg.zip dist/package/libvulkan_panfrost.so | tee dist/SHA256SUMS
+          cp source/work/mesa/.git/HEAD dist/mesa-head.txt || true
+
+      - name: Upload test package and diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: panvk-g720-mc7-test
+          path: |
+            dist/PanVK-G720-MC7-test.adpkg.zip
+            dist/SHA256SUMS
+            dist/elf-header.txt
+            dist/elf-dynamic.txt
+          if-no-files-found: error
+          retention-days: 14
