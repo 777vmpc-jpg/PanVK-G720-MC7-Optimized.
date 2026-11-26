@@ -204,11 +204,34 @@ vk_android_request_linear_swapchain_buffers_on_mediatek(void)
 """
 replace_once(vk_android_h, stub_old, stub_new)
 
-replace_once(physical,
+def replace_in_function(path: str, function_name: str, old: str, new: str) -> None:
+    p = ROOT / path
+    data = p.read_text()
+    start = data.find(function_name)
+    if start < 0:
+        raise SystemExit(f"{path}: function not found: {function_name}")
+    end = data.find("\n}\n", start)
+    if end < 0:
+        raise SystemExit(f"{path}: end of function not found: {function_name}")
+    body = data[start:end]
+    if new.strip() in body:
+        return
+    count = body.count(old)
+    if count != 1:
+        raise SystemExit(
+            f"{path}:{function_name}: expected one anchor, found {count}: {old!r}"
+        )
+    body = body.replace(old, new, 1)
+    p.write_text(data[:start] + body + data[end:])
+
+replace_in_function(
+    physical,
+    "panvk_physical_device_init_kbase(",
     '   unsigned arch = pan_arch(device->kmod.dev->props.gpu_id);\n',
     '   unsigned arch = pan_arch(device->kmod.dev->props.gpu_id);\n\n'
     '   vk_android_request_cpu_usable_swapchain_buffers();\n'
     '   if (arch >= 5)\n'
-    '      vk_android_request_linear_swapchain_buffers_on_mediatek();\n')
+    '      vk_android_request_linear_swapchain_buffers_on_mediatek();\n'
+)
 
 print("Applied Faux123 1.1.9 MediaTek AHB usage behavior.")
