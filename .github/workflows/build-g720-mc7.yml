@@ -30,7 +30,7 @@ jobs:
             libexpat1-dev libzstd-dev zlib1g-dev libdrm-dev libelf-dev \
             libwayland-dev wayland-protocols libx11-dev libxcb1-dev \
             libxcb-randr0-dev libxcb-xfixes0-dev libxcb-sync-dev \
-            libxcb-present-dev libxshmfence-dev libxml2-dev
+            libxcb-present-dev libxshmfence-dev libxml2-dev libllvmspirvlib-18-dev
 
       - name: Upgrade Meson for pinned Mesa source
         run: |
