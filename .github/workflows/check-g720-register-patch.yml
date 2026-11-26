@@ -12,35 +12,58 @@ permissions:
 jobs:
   patch-check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Fetch exact Mesa base
+      - name: Fetch the exact public Kbase/CSF stack and Faux123 Mesa base
         shell: bash
         run: |
           set -euxo pipefail
-          git clone --filter=blob:none --no-checkout https://gitlab.freedesktop.org/mesa/mesa.git mesa
-          git -C mesa fetch --depth=1 origin 5a07217f034b3e50d8c7c7794f97a2df1742613b
-          git -C mesa checkout --detach FETCH_HEAD
-          test "$(git -C mesa rev-parse HEAD)" = "5a07217f034b3e50d8c7c7794f97a2df1742613b"
+          git clone --filter=blob:none https://github.com/zenithblue-oss/panvk-kbase-android.git source
+          git -C source checkout --detach cf70e02b918e1864cbcd746a7fefa57b96c673ce
+          git -C source config user.name "PanVK CI"
+          git -C source config user.email "panvk-ci@users.noreply.github.com"
+          bash source/scripts/fetch-mesa.sh
+          test "$(git -C source/work/mesa rev-parse HEAD)" = "5a07217f034b3e50d8c7c7794f97a2df1742613b"
 
-      - name: Check G720 CSF register-count patch
+      - name: Apply the same pinned Kbase/CSF series as the MC7 test build
         shell: bash
         run: |
           set -euxo pipefail
+          bash source/scripts/prepare-rc5-tree.sh --mesa "$PWD/source/work/mesa" --csf-max 233 --wip-max 0175
+          git -C source/work/mesa diff --check
+          echo "Prepared Mesa tree: $(git -C source/work/mesa rev-parse HEAD)"
+          grep -n -E "cs_reg_count|stream_features|unpreserved_cs_reg_count" source/work/mesa/src/panfrost/lib/kmod/kbase_kmod.c source/work/mesa/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c || true
+
+      - name: Check the G720 CSF register-count patch on the prepared tree
+        shell: bash
+        run: |
+          set -euo pipefail
           curl -fL --retry 3 \
             https://raw.githubusercontent.com/wonderkast02/panvk-g720-kbase-csf/d9cbb91e5df720f0a62c4b5010d96c327aec315f/patches/0001-panvk-kbase-g720-register-count.patch \
             -o /tmp/g720-register-count.patch
-          git -C mesa apply --check /tmp/g720-register-count.patch
-          echo "PATCH_APPLIES=1" | tee patch-check-result.txt
+          if git -C source/work/mesa apply --check /tmp/g720-register-count.patch; then
+            echo "PATCH_APPLIES_AFTER_KBASE_SERIES=1" | tee patch-check-result.txt
+          else
+            echo "PATCH_APPLIES_AFTER_KBASE_SERIES=0" | tee patch-check-result.txt
+            echo "=== Current register-count implementation ==="
+            grep -n -C 8 -E "cs_reg_count|stream_features|unpreserved_cs_reg_count" \
+              source/work/mesa/src/panfrost/lib/kmod/kbase_kmod.c \
+              source/work/mesa/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c || true
+            echo "=== Patch context ==="
+            cat /tmp/g720-register-count.patch
+            exit 1
+          fi
           sha256sum /tmp/g720-register-count.patch | tee -a patch-check-result.txt
-          git -C mesa status --short
+          git -C source/work/mesa rev-parse HEAD | tee -a patch-check-result.txt
+          git -C source/work/mesa status --short
 
       - name: Upload patch-check report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: faux123-1.1.9-g720-patch-check
           path: patch-check-result.txt
-          if-no-files-found: error
+          if-no-files-found: ignore
