@@ -32,6 +32,11 @@ jobs:
             libxcb-randr0-dev libxcb-xfixes0-dev libxcb-sync-dev \
             libxcb-present-dev libxshmfence-dev libxml2-dev
 
+      - name: Upgrade Meson for pinned Mesa source
+        run: |
+          python3 -m pip install --user --break-system-packages "meson>=1.4.0"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Install Android command-line tools
         uses: android-actions/setup-android@v3
         with:
