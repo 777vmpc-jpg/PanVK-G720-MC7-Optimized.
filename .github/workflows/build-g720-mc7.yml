@@ -81,6 +81,17 @@ jobs:
           git config --global user.email "panvk-ci@users.noreply.github.com"
           bash ./scripts/prepare-rc5-tree.sh --mesa "$PWD/work/mesa" --csf-max 233 --wip-max 0175
 
+      - name: Inspect exact Android WSI source after pinned patches
+        run: |
+          set -euo pipefail
+          cd source/work/mesa
+          echo '=== WSI symbols and Android buffer calls ==='
+          grep -n -E 'AHardwareBuffer_allocate|CreateImage|GetAndroidHardwareBufferPropertiesANDROID|AllocateMemory|BindImageMemory2|panvk_android_swapchain|mesa_logi|mesa_logi' src/panfrost/vulkan/panvk_wsi.c || true
+          echo '=== WSI source lines 250-520 ==='
+          sed -n '250,520p' src/panfrost/vulkan/panvk_wsi.c
+          echo '=== logging macro availability ==='
+          grep -R -n -m 8 'define mesa_logi\|mesa_logi(' src/panfrost/vulkan | head -30 || true
+
       - name: Add Android WSI failure-stage diagnostics
         run: |
           set -euo pipefail
