@@ -98,8 +98,8 @@ replace_once(vk_android_c,
     'static struct u_gralloc *_gralloc;\n',
     helpers)
 
-anb_old = """return vk_gralloc_to_drm_explicit_layout(&gr_handle, out,
-                                             out_layouts, max_planes);"""
+anb_old = """   return vk_gralloc_to_drm_explicit_layout(&gr_handle, out,
+                                            out_layouts, max_planes);"""
 anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, out,
                                                         out_layouts, max_planes);
    if (result != VK_SUCCESS ||
