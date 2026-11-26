@@ -69,6 +69,8 @@ jobs:
       - name: Apply pinned public Kbase/CSF patch series strictly
         run: |
           cd source
+          git config --global user.name "PanVK CI"
+          git config --global user.email "panvk-ci@users.noreply.github.com"
           bash ./scripts/prepare-rc5-tree.sh --mesa "$PWD/work/mesa" --csf-max 233 --wip-max 0175
 
       - name: Build Android ARM64 Vulkan ICD
