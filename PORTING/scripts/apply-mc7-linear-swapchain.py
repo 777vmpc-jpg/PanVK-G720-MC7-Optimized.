@@ -20,6 +20,26 @@ def replace_once(path: str, old: str, new: str) -> None:
         )
     p.write_text(data.replace(old, new, 1))
 
+def replace_in_function(path: str, function_name: str, old: str, new: str) -> None:
+    p = ROOT / path
+    data = p.read_text()
+    start = data.find(function_name)
+    if start < 0:
+        raise SystemExit(f"{path}: function not found: {function_name}")
+    end = data.find("\n}\n", start)
+    if end < 0:
+        raise SystemExit(f"{path}: end of function not found: {function_name}")
+    body = data[start:end]
+    if new.strip() in body:
+        return
+    count = body.count(old)
+    if count != 1:
+        raise SystemExit(
+            f"{path}:{function_name}: expected one anchor, found {count}: {old!r}"
+        )
+    body = body.replace(old, new, 1)
+    p.write_text(data[:start] + body + data[end:])
+
 vk_android_c = "src/vulkan/runtime/vk_android.c"
 vk_android_h = "src/vulkan/runtime/vk_android.h"
 physical = "src/panfrost/vulkan/panvk_physical_device.c"
@@ -133,7 +153,7 @@ anb_new = """   VkResult result = vk_gralloc_to_drm_explicit_layout(&gr_handle, 
 
    return VK_SUCCESS;
 }"""
-replace_once(vk_android_c, anb_old, anb_new)
+replace_in_function(vk_android_c, "vk_android_get_anb_layout(", anb_old, anb_new)
 
 usage2_old = """   /* for front buffer rendering */
    if (swapchainImageUsage & VK_SWAPCHAIN_IMAGE_USAGE_SHARED_BIT_ANDROID)
