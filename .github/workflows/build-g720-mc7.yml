@@ -31,12 +31,13 @@ jobs:
             libxcb-randr0-dev libxcb-xfixes0-dev libxcb-sync-dev \
             libxcb-present-dev libxshmfence-dev libxml2-dev
 
-      - name: Install Android NDK
-        uses: android-actions/setup-android@v3
-      - name: Install pinned NDK
+      - name: Install pinned Android NDK
         run: |
-          sdkmanager "ndk;27.3.13750724"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.3.13750724" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          echo "/usr/local/lib/android/sdk/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
+          yes | /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager --licenses >/dev/null
+          /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager "ndk;27.3.13750724"
+          echo "ANDROID_NDK_ROOT=/usr/local/lib/android/sdk/ndk/27.3.13750724" >> "$GITHUB_ENV"
 
       - name: Fetch exact Mesa source
         run: |
