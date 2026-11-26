@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build:
@@ -31,13 +32,32 @@ jobs:
             libxcb-randr0-dev libxcb-xfixes0-dev libxcb-sync-dev \
             libxcb-present-dev libxshmfence-dev libxml2-dev
 
+      - name: Install Android command-line tools
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 12266719
+          packages: platform-tools
       - name: Install pinned Android NDK
         run: |
-          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
-          echo "/usr/local/lib/android/sdk/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
-          yes | /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager --licenses >/dev/null
-          /usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager "ndk;27.3.13750724"
-          echo "ANDROID_NDK_ROOT=/usr/local/lib/android/sdk/ndk/27.3.13750724" >> "$GITHUB_ENV"
+          sdkmanager "ndk;27.3.13750724"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.3.13750724" >> "$GITHUB_ENV"
+
+      - name: Retrieve immutable Faux123 1.1.9 reference
+        uses: actions/download-artifact@v4
+        with:
+          name: faux123-panvk-1.1.9-recovered
+          repository: ${{ github.repository }}
+          run-id: 45851559598
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: reference/faux123-recovery
+      - name: Preserve original Faux123 package and metadata
+        run: |
+          set -euo pipefail
+          mkdir -p dist/reference-faux123-1.1.9
+          cp reference/faux123-recovery/work/panvk_faux123_v1.1.9.adpkg.zip dist/reference-faux123-1.1.9/
+          unzip -p dist/reference-faux123-1.1.9/panvk_faux123_v1.1.9.adpkg.zip meta.json > dist/reference-faux123-1.1.9/meta.json
+          unzip -p dist/reference-faux123-1.1.9/panvk_faux123_v1.1.9.adpkg.zip libvulkan_panfrost.so > dist/reference-faux123-1.1.9/libvulkan_panfrost.so
+          sha256sum dist/reference-faux123-1.1.9/*
 
       - name: Fetch exact Mesa source
         run: |
@@ -93,5 +113,6 @@ jobs:
             dist/SHA256SUMS
             dist/elf-header.txt
             dist/elf-dynamic.txt
+            dist/reference-faux123-1.1.9/**
           if-no-files-found: error
           retention-days: 14
