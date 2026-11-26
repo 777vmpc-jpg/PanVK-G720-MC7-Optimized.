@@ -73,7 +73,30 @@ jobs:
           git clone https://github.com/zenithblue-oss/panvk-kbase-android.git source
           cd source
           git checkout cf70e02b918e1864cbcd746a7fefa57b96c673ce
-          bash ./scripts/fetch-mesa.sh
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          lock = json.loads(Path("sources.lock").read_text())
+          mesa = Path("work/mesa")
+          mesa.mkdir(parents=True, exist_ok=True)
+          subprocess.run(["git", "init"], cwd=mesa, check=True,
+                         stdout=subprocess.DEVNULL)
+          subprocess.run(["git", "remote", "add", "origin", lock["mesaRepo"]],
+                         cwd=mesa, check=True)
+          subprocess.run(["git", "fetch", "--depth", "1", "origin",
+                          lock["mesaCommit"]], cwd=mesa, check=True)
+          subprocess.run(["git", "checkout", "--detach", "FETCH_HEAD"],
+                         cwd=mesa, check=True)
+          subprocess.run(["git", "reset", "--hard", lock["mesaCommit"]],
+                         cwd=mesa, check=True)
+          head = subprocess.check_output(["git", "rev-parse", "HEAD"],
+                                         cwd=mesa, text=True).strip()
+          if head != lock["mesaCommit"]:
+              raise SystemExit(f"Mesa pin mismatch: {head}")
+          print(f"OK shallow Mesa checkout: {head}")
+          PY
 
       - name: Apply pinned public Kbase/CSF patch series strictly
         run: |
