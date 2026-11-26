@@ -39,7 +39,7 @@ diff --git a/src/panfrost/vulkan/panvk_wsi.c b/src/panfrost/vulkan/panvk_wsi.c
           panvk_android_swapchain_destroy(&chain->base, pAllocator);
           return result;
        }
-@@ -445,6 +458,9 @@
+@@ -445,5 +458,9 @@
        result = dev->dispatch_table.BindImageMemory2(device, 1, &bmi);
        if (result != VK_SUCCESS) {
 +         mesa_logi("panvk-wsi-diag: stage=bind_image_memory index=%u result=%d image=%p memory=%p",
