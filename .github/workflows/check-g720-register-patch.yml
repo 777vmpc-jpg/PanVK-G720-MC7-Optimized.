@@ -123,6 +123,22 @@ jobs:
           git diff --check
           grep -n -E 'vk_android_swapchain_cpu_usage|AHB usage query|vk_android_request_linear_swapchain' src/vulkan/runtime/vk_android.c src/panfrost/vulkan/panvk_physical_device.c
 
+      - name: Enable guarded coherent command pools for MT6899 G720 experiment
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("source/work/mesa/src/panfrost/lib/kmod/kbase_kmod.c")
+          s = p.read_text()
+          old = 'debug_get_bool_option("PANVK_KBASE_COHERENT_POOLS", false)'
+          assert s.count(old) == 1
+          # Existing upstream checks CSF, ACE/ACE-Lite and returned allocation flags.
+          # Explicit environment override remains available.
+          s = s.replace(old, 'debug_get_bool_option("PANVK_KBASE_COHERENT_POOLS", true)')
+          p.write_text(s)
+          PY
+          git -C source/work/mesa diff --check
+
       - name: Build Android ARM64 Vulkan ICD
         env:
           PANVK_JOBS: 2
@@ -145,29 +161,29 @@ jobs:
           cat > dist/package/meta.json <<'EOF'
           {
             "schemaVersion": 1,
-            "name": "PanVK Faux123 1.1.9 G720 MC7 public-source port",
+            "name": "PanVK Faux123 1.1.9 G720 MC7 coherent pools test",
             "description": "Experimental Android Kbase/CSF port from pinned Mesa and public patches, with the MediaTek linear-AHB usage behavior reconstructed from Faux123 1.1.9. Not byte-identical to Faux123 and not hardware-validated for BOTWRecomp.",
             "author": "Mesa/Panfrost contributors and public patch authors; see source provenance",
-            "packageVersion": "1.1.9-mc7-public-port",
+            "packageVersion": "1.1.9-mc7-coherent-pools-test",
             "vendor": "Mesa",
             "driverVersion": "26.3.0-devel-port",
             "minApi": 29,
             "libraryName": "libvulkan_panfrost.so"
           }
           EOF
-          archive=PanVK-Faux123-1.1.9-G720-MC7-public-port.adpkg.zip
+          archive=PanVK-Faux123-1.1.9-G720-MC7-coherent-pools-test.adpkg.zip
           (cd dist/package && zip -q -9 "../$archive" libvulkan_panfrost.so meta.json)
           unzip -tq "dist/$archive"
           unzip -p "dist/$archive" meta.json | python3 -c 'import json,sys; assert json.load(sys.stdin)["libraryName"] == "libvulkan_panfrost.so"'
-          sha256sum dist/PanVK-Faux123-1.1.9-G720-MC7-public-port.adpkg.zip dist/package/libvulkan_panfrost.so | tee dist/SHA256SUMS
+          sha256sum dist/PanVK-Faux123-1.1.9-G720-MC7-coherent-pools-test.adpkg.zip dist/package/libvulkan_panfrost.so | tee dist/SHA256SUMS
           git -C source/work/mesa rev-parse HEAD > dist/mesa-head.txt
 
       - name: Upload test package and diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: panvk-g720-mc7-test
+          name: panvk-g720-mc7-coherent-pools-test
           path: |
-            dist/PanVK-Faux123-1.1.9-G720-MC7-public-port.adpkg.zip
+            dist/PanVK-Faux123-1.1.9-G720-MC7-coherent-pools-test.adpkg.zip
             dist/SHA256SUMS
             dist/mesa-head.txt
             dist/elf-header.txt
