@@ -1,56 +1,177 @@
-name: Check Faux123 1.1.9 G720 MC7 port patch
+name: Build and check PanVK G720 MC7 ARM64
+
 on:
   workflow_dispatch:
   push:
+    branches: [panvk/g720-mc7-fnaddr-fix]
     paths:
-      - ".github/workflows/check-g720-register-patch.yml"
-      - "docs/FAUX123-1.1.9-G720-MC7-PORT-AUDIT.md"
-      - "patches/0002-fix-provoking-vertex-fn-address-truncation.patch"
+      - .github/workflows/check-g720-register-patch.yml
+      - SOURCES.lock.json
+      - PORTING/**
+      - patches/**
 
 permissions:
   contents: read
 
 jobs:
-  patch-check:
+  build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 360
     steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
+      - name: Checkout port repository
+        uses: actions/checkout@v5
 
-      - name: Fetch exact Mesa base
-        shell: bash
+      - name: Install build dependencies
         run: |
-          set -euxo pipefail
-          git clone --filter=blob:none --no-checkout https://gitlab.freedesktop.org/mesa/mesa.git mesa
-          git -C mesa fetch --depth=1 origin 5a07217f034b3e50d8c7c7794f97a2df1742613b
-          git -C mesa checkout --detach FETCH_HEAD
-          test "$(git -C mesa rev-parse HEAD)" = "5a07217f034b3e50d8c7c7794f97a2df1742613b"
+          sudo apt-get update
+          sudo apt-get install -y git curl wget unzip zip xz-utils pkg-config \
+            python3 python3-pip python3-mako python3-yaml python3-setuptools \
+            meson ninja-build flex bison cmake build-essential clang llvm \
+            libexpat1-dev libzstd-dev zlib1g-dev libdrm-dev libelf-dev \
+            llvm-18-dev clang-18 libclang-18-dev libclang-cpp18-dev libdisplay-info-dev \
+            libwayland-dev wayland-protocols libx11-dev libx11-xcb-dev libxcb1-dev \
+            libxcb-randr0-dev libxcb-shm0-dev libxcb-dri3-dev libxcb-dri2-0-dev \
+            libxcb-glx0-dev libxcb-xfixes0-dev libxcb-sync-dev \
+            libxcb-present-dev libxshmfence-dev libxml2-dev libllvmspirvlib-18-dev \
+            spirv-tools libudev-dev
 
-      - name: Check G720 CSF register-count patch
-        shell: bash
+      - name: Upgrade Meson for pinned Mesa source
         run: |
-          set -euxo pipefail
-          curl -fL --retry 3 \
-            https://raw.githubusercontent.com/wonderkast02/panvk-g720-kbase-csf/d9cbb91e5df720f0a62c4b5010d96c327aec315f/patches/0001-panvk-kbase-g720-register-count.patch \
-            -o /tmp/g720-register-count.patch
-          git -C mesa apply --check /tmp/g720-register-count.patch
-          echo "REGISTER_COUNT_PATCH_APPLIES=1" | tee patch-check-result.txt
-          sha256sum /tmp/g720-register-count.patch | tee -a patch-check-result.txt
-          git -C mesa status --short
+          python3 -m pip install --user --break-system-packages "meson>=1.4.0"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Check 64-bit provoking-vertex function address fix
-        shell: bash
+      - name: Install Android command-line tools
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 12266719
+          packages: platform-tools
+      - name: Install pinned Android NDK
         run: |
-          set -euxo pipefail
-          git -C mesa apply --check "$GITHUB_WORKSPACE/patches/0002-fix-provoking-vertex-fn-address-truncation.patch"
-          echo "FN_ADDR_64BIT_PATCH_APPLIES=1" | tee -a patch-check-result.txt
-          sha256sum "$GITHUB_WORKSPACE/patches/0002-fix-provoking-vertex-fn-address-truncation.patch" | tee -a patch-check-result.txt
-          git -C mesa status --short
+          sdkmanager "ndk;27.3.13750724"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.3.13750724" >> "$GITHUB_ENV"
 
-      - name: Upload patch-check report
+      - name: Download and verify original Faux123 1.1.9 reference
+        run: |
+          set -euo pipefail
+          mkdir -p dist/reference-faux123-1.1.9
+          archive=dist/reference-faux123-1.1.9/panvk_faux123_v1.1.9.adpkg.zip
+          curl --fail --location --retry 3 \
+            https://github.com/faux123/panvk-faux123-driver-rp4pro/releases/download/v1.1.9/panvk_faux123_v1.1.9.adpkg.zip \
+            --output "$archive"
+          echo "b611ea3217b28b8e965cd6ecfc622f0fef59f00c19ea1b417092e13c23038630  $archive" | sha256sum -c -
+          unzip -p "$archive" meta.json > dist/reference-faux123-1.1.9/meta.json
+          unzip -p "$archive" libvulkan_panfrost.so > dist/reference-faux123-1.1.9/libvulkan_panfrost.so
+          echo "a9ac19b87640757fa17eb045a65a13326c9039fe2cc5a55e901b324fc2d75e61  dist/reference-faux123-1.1.9/libvulkan_panfrost.so" | sha256sum -c -
+
+      - name: Fetch exact Mesa source
+        run: |
+          git clone https://github.com/zenithblue-oss/panvk-kbase-android.git source
+          cd source
+          git checkout cf70e02b918e1864cbcd746a7fefa57b96c673ce
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          lock = json.loads(Path("sources.lock").read_text())
+          mesa = Path("work/mesa")
+          mesa.mkdir(parents=True, exist_ok=True)
+          subprocess.run(["git", "init"], cwd=mesa, check=True,
+                         stdout=subprocess.DEVNULL)
+          subprocess.run(["git", "remote", "add", "origin", lock["mesaRepo"]],
+                         cwd=mesa, check=True)
+          subprocess.run(["git", "fetch", "--depth", "1", "origin",
+                          lock["mesaCommit"]], cwd=mesa, check=True)
+          subprocess.run(["git", "checkout", "--detach", "FETCH_HEAD"],
+                         cwd=mesa, check=True)
+          subprocess.run(["git", "reset", "--hard", lock["mesaCommit"]],
+                         cwd=mesa, check=True)
+          head = subprocess.check_output(["git", "rev-parse", "HEAD"],
+                                         cwd=mesa, text=True).strip()
+          if head != lock["mesaCommit"]:
+              raise SystemExit(f"Mesa pin mismatch: {head}")
+          print(f"OK shallow Mesa checkout: {head}")
+          PY
+
+      - name: Apply pinned public Kbase/CSF patch series strictly
+        run: |
+          cd source
+          git config --global user.name "PanVK CI"
+          git config --global user.email "panvk-ci@users.noreply.github.com"
+          bash ./scripts/prepare-rc5-tree.sh --mesa "$PWD/work/mesa" --csf-max 233 --wip-max 0175
+
+      - name: Apply G720 register-count and function-address corrections
+        run: |
+          set -euo pipefail
+          python3 PORTING/scripts/apply-g720-csf.py source/work/mesa
+          git -C source/work/mesa diff --check
+
+      - name: Add Android WSI failure-stage diagnostics
+        run: |
+          set -euo pipefail
+          python3 PORTING/scripts/instrument-android-wsi.py
+          cd source/work/mesa
+          git diff --check
+          git diff --stat
+          grep -n 'panvk-wsi-diag:' src/panfrost/vulkan/panvk_wsi.c
+
+      - name: Port Faux123 1.1.9 MediaTek linear AHB rule
+        run: |
+          set -euo pipefail
+          python3 PORTING/scripts/apply-mc7-linear-swapchain.py
+          cd source/work/mesa
+          git diff --check
+          grep -n -E 'vk_android_swapchain_cpu_usage|AHB usage query|vk_android_request_linear_swapchain' src/vulkan/runtime/vk_android.c src/panfrost/vulkan/panvk_physical_device.c
+
+      - name: Build Android ARM64 Vulkan ICD
+        env:
+          PANVK_JOBS: 2
+          ANDROID_API: 29
+        run: |
+          cd source
+          MESA="$PWD/work/mesa" bash ./scripts/build-android.sh --profile g720-v12-csf --api 29 --ndk "$ANDROID_NDK_ROOT"
+
+      - name: Verify ELF and generate package
+        run: |
+          set -euo pipefail
+          mkdir -p dist/package
+          cp source/dist/android-g720-v12-csf/libvulkan_panfrost.so dist/package/
+          llvm-readelf -h dist/package/libvulkan_panfrost.so | tee dist/elf-header.txt
+          llvm-readelf -d dist/package/libvulkan_panfrost.so | tee dist/elf-dynamic.txt
+          grep -Eq 'Class: +ELF64' dist/elf-header.txt
+          grep -Eq 'Type: +DYN' dist/elf-header.txt
+          grep -Eq 'Machine: +AArch64' dist/elf-header.txt
+          grep -F '(SONAME)' dist/elf-dynamic.txt | grep -F '[libvulkan_panfrost.so]'
+          cat > dist/package/meta.json <<'EOF'
+          {
+            "schemaVersion": 1,
+            "name": "PanVK Faux123 1.1.9 G720 MC7 public-source port",
+            "description": "Experimental Android Kbase/CSF port from pinned Mesa and public patches, with the MediaTek linear-AHB usage behavior reconstructed from Faux123 1.1.9. Not byte-identical to Faux123 and not hardware-validated for BOTWRecomp.",
+            "author": "Mesa/Panfrost contributors and public patch authors; see source provenance",
+            "packageVersion": "1.1.9-mc7-public-port",
+            "vendor": "Mesa",
+            "driverVersion": "26.3.0-devel-port",
+            "minApi": 29,
+            "libraryName": "libvulkan_panfrost.so"
+          }
+          EOF
+          archive=PanVK-Faux123-1.1.9-G720-MC7-public-port.adpkg.zip
+          (cd dist/package && zip -q -9 "../$archive" libvulkan_panfrost.so meta.json)
+          unzip -tq "dist/$archive"
+          unzip -p "dist/$archive" meta.json | python3 -c 'import json,sys; assert json.load(sys.stdin)["libraryName"] == "libvulkan_panfrost.so"'
+          sha256sum dist/PanVK-Faux123-1.1.9-G720-MC7-public-port.adpkg.zip dist/package/libvulkan_panfrost.so | tee dist/SHA256SUMS
+          git -C source/work/mesa rev-parse HEAD > dist/mesa-head.txt
+
+      - name: Upload test package and diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: faux123-1.1.9-g720-patch-check
-          path: patch-check-result.txt
+          name: panvk-g720-mc7-test
+          path: |
+            dist/PanVK-Faux123-1.1.9-G720-MC7-public-port.adpkg.zip
+            dist/SHA256SUMS
+            dist/mesa-head.txt
+            dist/elf-header.txt
+            dist/elf-dynamic.txt
+            dist/reference-faux123-1.1.9/**
           if-no-files-found: error
+          retention-days: 14

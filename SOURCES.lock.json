@@ -1,0 +1,37 @@
+{
+  "baseline": {
+    "name": "Faux123 PanVK v1.1.9",
+    "packageSha256": "b611ea3217b28b8e965cd6ecfc622f0fef59f00c19ea1b417092e13c23038630",
+    "librarySha256": "a9ac19b87640757fa17eb045a65a13326c9039fe2cc5a55e901b324fc2d75e61",
+    "mesaCommit": "5a07217f034b3e50d8c7c7794f97a2df1742613b",
+    "privatePatchCount": 49,
+    "privatePatchSourceAvailable": false
+  },
+  "publicBuildInputs": {
+    "kbasePatchRepository": "https://github.com/zenithblue-oss/panvk-kbase-android",
+    "kbasePatchCommit": "cf70e02b918e1864cbcd746a7fefa57b96c673ce",
+    "mesaCommit": "5a07217f034b3e50d8c7c7794f97a2df1742613b",
+    "csfV11Max": "233",
+    "jmV7WipMax": "0175",
+    "g720ReferenceRepository": "https://github.com/wonderkast02/panvk-g720-kbase-csf",
+    "g720ReferenceCommit": "4082e6abb551b5cc81751c7d7fa2510d76b13fe0",
+    "additionalReferenceRepository": "https://github.com/MineGraph-bilibili/panvk-Android",
+    "additionalReferenceCommit": "9e7214971a8839b8260654f650fd5712b486dc42"
+  },
+  "target": {
+    "device": "Xiaomi 2412DPC0AG",
+    "soc": "MediaTek MT6899",
+    "gpu": "Mali-G720 MC7",
+    "gpuId": "0xc8700010",
+    "panArch": 12,
+    "frontend": "CSF",
+    "androidApi": 36,
+    "kernel": "6.6"
+  },
+  "policy": {
+    "doNotUseBuild177AsBase": true,
+    "doNotCopyMC8OnlyChangesWithoutReview": true,
+    "doNotEnableUntestedV12FeaturesByDefault": true,
+    "hardwareValidationRequired": true
+  }
+}
