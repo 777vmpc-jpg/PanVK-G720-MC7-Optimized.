@@ -1,0 +1,51 @@
+diff --git a/src/panfrost/vulkan/panvk_wsi.c b/src/panfrost/vulkan/panvk_wsi.c
+--- a/src/panfrost/vulkan/panvk_wsi.c
++++ b/src/panfrost/vulkan/panvk_wsi.c
+@@ -366,4 +366,10 @@
+-      if (AHardwareBuffer_allocate(&desc, &chain->images[i].ahb) != 0 || !chain->images[i].ahb) {
++      int ahb_rc = AHardwareBuffer_allocate(&desc, &chain->images[i].ahb);
++      if (ahb_rc != 0 || !chain->images[i].ahb) {
++         mesa_logi("panvk-wsi-diag: stage=ahb_allocate index=%u rc=%d ahb=%p extent=%ux%u format=%u usage=0x%llx",
++                   i, ahb_rc, chain->images[i].ahb, desc.width, desc.height,
++                   desc.format, (unsigned long long)desc.usage);
+          panvk_android_swapchain_destroy(&chain->base, pAllocator);
+          return VK_ERROR_INITIALIZATION_FAILED;
+       }
++      mesa_logi("panvk-wsi-diag: stage=ahb_allocate index=%u rc=0 ahb=%p extent=%ux%u stride=%u",
++                i, chain->images[i].ahb, desc.width, desc.height, desc.stride);
+@@ -395,5 +400,7 @@
+       result = dev->dispatch_table.CreateImage(device, &ici, pAllocator, &chain->images[i].base.image);
+       if (result != VK_SUCCESS) {
++         mesa_logi("panvk-wsi-diag: stage=create_image index=%u result=%d format=%u usage=0x%x extent=%ux%u",
++                   i, result, ici.format, ici.usage, ici.extent.width, ici.extent.height);
+          panvk_android_swapchain_destroy(&chain->base, pAllocator);
+          return result;
+       }
+@@ -405,5 +412,9 @@
+       result = panvk_GetAndroidHardwareBufferPropertiesANDROID(device, chain->images[i].ahb, &ahb_props);
+       if (result != VK_SUCCESS) {
++         mesa_logi("panvk-wsi-diag: stage=ahb_properties index=%u result=%d ahb=%p",
++                   i, result, chain->images[i].ahb);
+          panvk_android_swapchain_destroy(&chain->base, pAllocator);
+          return result;
+       }
++      mesa_logi("panvk-wsi-diag: stage=ahb_properties index=%u result=0 allocation=%llu memoryTypeBits=0x%x",
++                i, (unsigned long long)ahb_props.allocationSize, ahb_props.memoryTypeBits);
+@@ -433,5 +444,7 @@
+       result = dev->dispatch_table.AllocateMemory(device, &mai, pAllocator, &chain->images[i].base.memory);
+       if (result != VK_SUCCESS) {
++         mesa_logi("panvk-wsi-diag: stage=allocate_memory index=%u result=%d size=%llu memoryTypeIndex=%u",
++                   i, result, (unsigned long long)mai.allocationSize, mai.memoryTypeIndex);
+          panvk_android_swapchain_destroy(&chain->base, pAllocator);
+          return result;
+       }
+@@ -445,5 +458,9 @@
+       result = dev->dispatch_table.BindImageMemory2(device, 1, &bmi);
+       if (result != VK_SUCCESS) {
++         mesa_logi("panvk-wsi-diag: stage=bind_image_memory index=%u result=%d image=%p memory=%p",
++                   i, result, chain->images[i].base.image, chain->images[i].base.memory);
+          panvk_android_swapchain_destroy(&chain->base, pAllocator);
+          return result;
+       }
++      mesa_logi("panvk-wsi-diag: stage=swapchain_image_ready index=%u image=%p memory=%p",
++                i, chain->images[i].base.image, chain->images[i].base.memory);
