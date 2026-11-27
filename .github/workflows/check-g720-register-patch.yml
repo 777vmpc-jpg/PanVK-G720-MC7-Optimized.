@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/check-g720-register-patch.yml"
       - "docs/FAUX123-1.1.9-G720-MC7-PORT-AUDIT.md"
+      - "patches/0002-fix-provoking-vertex-fn-address-truncation.patch"
 
 permissions:
   contents: read
@@ -34,8 +35,17 @@ jobs:
             https://raw.githubusercontent.com/wonderkast02/panvk-g720-kbase-csf/d9cbb91e5df720f0a62c4b5010d96c327aec315f/patches/0001-panvk-kbase-g720-register-count.patch \
             -o /tmp/g720-register-count.patch
           git -C mesa apply --check /tmp/g720-register-count.patch
-          echo "PATCH_APPLIES=1" | tee patch-check-result.txt
+          echo "REGISTER_COUNT_PATCH_APPLIES=1" | tee patch-check-result.txt
           sha256sum /tmp/g720-register-count.patch | tee -a patch-check-result.txt
+          git -C mesa status --short
+
+      - name: Check 64-bit provoking-vertex function address fix
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git -C mesa apply --check "$GITHUB_WORKSPACE/patches/0002-fix-provoking-vertex-fn-address-truncation.patch"
+          echo "FN_ADDR_64BIT_PATCH_APPLIES=1" | tee -a patch-check-result.txt
+          sha256sum "$GITHUB_WORKSPACE/patches/0002-fix-provoking-vertex-fn-address-truncation.patch" | tee -a patch-check-result.txt
           git -C mesa status --short
 
       - name: Upload patch-check report
