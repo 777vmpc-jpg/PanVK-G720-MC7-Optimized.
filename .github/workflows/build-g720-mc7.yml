@@ -1,182 +1,64 @@
-name: Build PanVK G720 MC7 test package
-# Rebuild after correcting the pinned Mesa ANB-layout patch anchor.
+name: Build PanVK G720 MC7 ARM64
 
 on:
   workflow_dispatch:
   push:
-    branches: [port/faux123-1.1.9-g720-mc7]
+    branches: [panvk/mc7-integration]
     paths:
       - .github/workflows/build-g720-mc7.yml
-      - SOURCES.lock.json
       - PORTING/**
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 360
+    timeout-minutes: 120
     steps:
-      - name: Checkout port repository
-        uses: actions/checkout@v4
-
-      - name: Install build dependencies
+      - uses: actions/checkout@v4
+      - name: Install host build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git curl wget unzip zip xz-utils pkg-config \
-            python3 python3-pip python3-mako python3-yaml python3-setuptools \
-            meson ninja-build flex bison cmake build-essential clang llvm \
-            libexpat1-dev libzstd-dev zlib1g-dev libdrm-dev libelf-dev \
-            llvm-18-dev clang-18 libclang-18-dev libclang-cpp18-dev libdisplay-info-dev \
-            libwayland-dev wayland-protocols libx11-dev libx11-xcb-dev libxcb1-dev \
-            libxcb-randr0-dev libxcb-shm0-dev libxcb-dri3-dev libxcb-dri2-0-dev \
-            libxcb-glx0-dev libxcb-xfixes0-dev libxcb-sync-dev \
-            libxcb-present-dev libxshmfence-dev libxml2-dev libllvmspirvlib-18-dev \
-            spirv-tools libudev-dev
-
-      - name: Upgrade Meson for pinned Mesa source
-        run: |
-          python3 -m pip install --user --break-system-packages "meson>=1.4.0"
+          sudo apt-get install -y flex bison pkg-config glslang-tools libdrm-dev libexpat1-dev \
+            llvm-18-dev clang-18 libclang-18-dev libclang-common-18-dev libclang-cpp18-dev libllvmspirvlib-18-dev libclc-18-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxcb-randr0-dev libxcb-dri3-dev \
+            libxext-dev libxcb-render0-dev libxcb-shape0-dev libxcb-shm0-dev libxcb-sync-dev libxcb-xfixes0-dev libxcb-present-dev libxshmfence-dev
+          python3 -m pip install --user --break-system-packages meson ninja mako packaging pyyaml
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install Android command-line tools
-        uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 12266719
           packages: platform-tools
-      - name: Install pinned Android NDK
+      - name: Install Android NDK
         run: |
-          sdkmanager "ndk;27.3.13750724"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.3.13750724" >> "$GITHUB_ENV"
-
-      - name: Retrieve immutable Faux123 1.1.9 reference
-        uses: actions/download-artifact@v4
-        with:
-          name: faux123-panvk-1.1.9-recovered
-          repository: ${{ github.repository }}
-          run-id: 45851559598
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: reference/faux123-recovery
-      - name: Preserve original Faux123 package and metadata
+          sdkmanager "ndk;27.2.12479018"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - name: Fetch pinned Mesa build scripts and Faux123 reference
         run: |
           set -euo pipefail
-          mkdir -p dist/reference-faux123-1.1.9
-          cp reference/faux123-recovery/work/panvk_faux123_v1.1.9.adpkg.zip dist/reference-faux123-1.1.9/
-          unzip -p dist/reference-faux123-1.1.9/panvk_faux123_v1.1.9.adpkg.zip meta.json > dist/reference-faux123-1.1.9/meta.json
-          unzip -p dist/reference-faux123-1.1.9/panvk_faux123_v1.1.9.adpkg.zip libvulkan_panfrost.so > dist/reference-faux123-1.1.9/libvulkan_panfrost.so
-          sha256sum dist/reference-faux123-1.1.9/*
-
-      - name: Fetch exact Mesa source
-        run: |
-          git clone https://github.com/zenithblue-oss/panvk-kbase-android.git source
-          cd source
-          git checkout cf70e02b918e1864cbcd746a7fefa57b96c673ce
-          python3 - <<'PY'
-          import json
-          import subprocess
-          from pathlib import Path
-
-          lock = json.loads(Path("sources.lock").read_text())
-          mesa = Path("work/mesa")
-          mesa.mkdir(parents=True, exist_ok=True)
-          subprocess.run(["git", "init"], cwd=mesa, check=True,
-                         stdout=subprocess.DEVNULL)
-          subprocess.run(["git", "remote", "add", "origin", lock["mesaRepo"]],
-                         cwd=mesa, check=True)
-          subprocess.run(["git", "fetch", "--depth", "1", "origin",
-                          lock["mesaCommit"]], cwd=mesa, check=True)
-          subprocess.run(["git", "checkout", "--detach", "FETCH_HEAD"],
-                         cwd=mesa, check=True)
-          subprocess.run(["git", "reset", "--hard", lock["mesaCommit"]],
-                         cwd=mesa, check=True)
-          head = subprocess.check_output(["git", "rev-parse", "HEAD"],
-                                         cwd=mesa, text=True).strip()
-          if head != lock["mesaCommit"]:
-              raise SystemExit(f"Mesa pin mismatch: {head}")
-          print(f"OK shallow Mesa checkout: {head}")
-          PY
-
-      - name: Apply pinned public Kbase/CSF patch series strictly
-        run: |
-          cd source
-          git config --global user.name "PanVK CI"
-          git config --global user.email "panvk-ci@users.noreply.github.com"
-          bash ./scripts/prepare-rc5-tree.sh --mesa "$PWD/work/mesa" --csf-max 233 --wip-max 0175
-
-      - name: Inspect exact Android WSI source after pinned patches
-        run: |
-          set -euo pipefail
-          cd source/work/mesa
-          echo '=== WSI symbols and Android buffer calls ==='
-          grep -n -E 'AHardwareBuffer_allocate|CreateImage|GetAndroidHardwareBufferPropertiesANDROID|AllocateMemory|BindImageMemory2|panvk_android_swapchain|mesa_logi|mesa_logi' src/panfrost/vulkan/panvk_wsi.c || true
-          echo '=== Exact swapchain creation source lines 550-670 ==='
-          sed -n '550,670p' src/panfrost/vulkan/panvk_wsi.c
-          echo '=== logging macro availability ==='
-          grep -R -n -m 8 'define mesa_logi\|mesa_logi(' src/panfrost/vulkan | head -30 || true
-
-      - name: Add Android WSI failure-stage diagnostics
-        run: |
-          set -euo pipefail
-          python3 PORTING/scripts/instrument-android-wsi.py
-          cd source/work/mesa
-          git diff --check
-          git diff --stat
-          grep -n 'panvk-wsi-diag:' src/panfrost/vulkan/panvk_wsi.c
-
-      - name: Port Faux123 1.1.9 MediaTek linear AHB rule
-        run: |
-          set -euo pipefail
-          python3 PORTING/scripts/apply-mc7-linear-swapchain.py
-          cd source/work/mesa
-          git diff --check
-          grep -n -E 'vk_android_swapchain_cpu_usage|AHB usage query|vk_android_request_linear_swapchain' src/vulkan/runtime/vk_android.c src/panfrost/vulkan/panvk_physical_device.c
-
-      - name: Build Android ARM64 Vulkan ICD
+          base=https://raw.githubusercontent.com/zenithblue-oss/panvk-kbase-android/cf70e02b918e1864cbcd746a7fefa57b96c673ce
+          mkdir -p source/meson source/scripts
+          for file in meson/android-aarch64.ini scripts/bootstrap-host-tools.sh scripts/build-android-deps.sh scripts/prepare-x11-headers.sh scripts/build-android.sh; do
+            curl -fLsS --retry 3 "$base/$file" -o "source/$file"
+          done
+          chmod +x source/scripts/*.sh
+          sed -i 's/aarch64-linux-android35-clang++/aarch64-linux-android29-clang++/' source/meson/android-aarch64.ini
+          curl -fLsS --retry 3 https://github.com/faux123/panvk-faux123-driver-rp4pro/releases/download/v1.1.9/panvk_faux123_v1.1.9.adpkg.zip -o faux123-original.zip
+          echo 'b611ea3217b28b8e965cd6ecfc622f0fef59f00c19ea1b417092e13c23038630  faux123-original.zip' | sha256sum -c
+      - name: Integrate Mesa, Kbase and MC7 changes
+        run: bash PORTING/scripts/prepare-mc7.sh
+      - name: Build Android ARM64 library
         env:
-          PANVK_JOBS: 2
-          ANDROID_API: 29
-        run: |
-          cd source
-          MESA="$PWD/work/mesa" bash ./scripts/build-android.sh --profile g720-v12-csf --api 29 --ndk "$ANDROID_NDK_ROOT"
-
-      - name: Verify ELF and generate package
-        run: |
-          set -euo pipefail
-          mkdir -p dist/package
-          cp source/dist/android-g720-v12-csf/libvulkan_panfrost.so dist/package/
-          llvm-readelf -h dist/package/libvulkan_panfrost.so | tee dist/elf-header.txt
-          llvm-readelf -d dist/package/libvulkan_panfrost.so | tee dist/elf-dynamic.txt
-          grep -q 'AArch64' dist/elf-header.txt
-          cat > dist/package/meta.json <<'EOF'
-          {
-            "schemaVersion": 1,
-            "name": "PanVK G720 MC7 public-source port (test build)",
-            "description": "Experimental Android Kbase/CSF port from pinned Mesa and public patches, with the MediaTek linear-AHB usage behavior reconstructed from Faux123 1.1.9. Not byte-identical to Faux123 and not hardware-validated for BOTWRecomp.",
-            "author": "Mesa/Panfrost contributors and public patch authors; see source provenance",
-            "packageVersion": "0.1.1-mc7-mtk-linear-ahb",
-            "vendor": "Mesa",
-            "driverVersion": "26.3.0-devel-port",
-            "minApi": 29,
-            "libraryName": "libvulkan_panfrost.so"
-          }
-          EOF
-          (cd dist/package && zip -q -9 -r ../PanVK-G720-MC7-test.adpkg .)
-          cp dist/PanVK-G720-MC7-test.adpkg dist/PanVK-G720-MC7-test.adpkg.zip
-          sha256sum dist/PanVK-G720-MC7-test.adpkg.zip dist/package/libvulkan_panfrost.so | tee dist/SHA256SUMS
-          cp source/work/mesa/.git/HEAD dist/mesa-head.txt || true
-
-      - name: Upload test package and diagnostics
-        uses: actions/upload-artifact@v4
+          PANVK_JOBS: 4
+        run: MESA="$PWD/source/work/mesa" source/scripts/build-android.sh --profile g720-v12-csf --api 29 --ndk "$ANDROID_NDK_ROOT"
+      - name: Verify and package ARM64 driver
+        run: bash PORTING/scripts/package-mc7.sh source/dist/android-g720-v12-csf/libvulkan_panfrost.so faux123-original.zip
+      - uses: actions/upload-artifact@v4
         with:
-          name: panvk-g720-mc7-test
+          name: panvk-faux123-1.1.9-g720-mc7-arm64
           path: |
-            dist/PanVK-G720-MC7-test.adpkg.zip
+            dist/*.zip
             dist/SHA256SUMS
-            dist/elf-header.txt
-            dist/elf-dynamic.txt
-            dist/reference-faux123-1.1.9/**
+            dist/elf-*.txt
           if-no-files-found: error
-          retention-days: 14
-
