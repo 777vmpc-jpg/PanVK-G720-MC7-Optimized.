@@ -88,8 +88,8 @@ vk_android_swapchain_cpu_usage(VkFormat format, VkImageUsageFlags usage)
       return false;
 
    const char *option = os_get_option("PANVK_ANB_LINEAR");
-   if (option && option[0] && strcmp(option, "0") != 0)
-      return true;
+   if (option && option[0])
+      return strcmp(option, "0") != 0;
 
    return vk_android_linear_swapchain_requested;
 }
