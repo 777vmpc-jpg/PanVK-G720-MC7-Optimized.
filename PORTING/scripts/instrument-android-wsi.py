@@ -50,7 +50,7 @@ replacements = [
                 i, (unsigned long long)ahb_props.allocationSize, ahb_props.memoryTypeBits);
 
       if (!ahb_props.memoryTypeBits) {
-         mesa_loge("panvk-wsi-diag: stage=ahb_memory_types index=%u allocation=%llu memoryTypeBits=0\n",
+         mesa_loge("panvk-wsi-diag: stage=ahb_memory_types index=%u allocation=%llu memoryTypeBits=0\\n",
                    i, (unsigned long long)ahb_props.allocationSize);
          panvk_android_swapchain_destroy(&chain->base, pAllocator);
          return VK_ERROR_INVALID_EXTERNAL_HANDLE;
