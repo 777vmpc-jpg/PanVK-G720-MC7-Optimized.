@@ -3,7 +3,7 @@ name: Build and check PanVK G720 MC7 ARM64
 on:
   workflow_dispatch:
   push:
-    branches: [panvk/mc7-peanuts-wsi-ab]
+    branches: [panvk/mc7-wsi-import-check]
     paths:
       - .github/workflows/check-g720-register-patch.yml
       - SOURCES.lock.json
@@ -145,21 +145,21 @@ jobs:
           cat > dist/package/meta.json <<'EOF'
           {
             "schemaVersion": 1,
-            "name": "PanVK Faux123 1.1.9 G720 MC7 Peanuts WSI A/B",
+            "name": "PanVK Faux123 1.1.9 G720 MC7 WSI Import Check",
             "description": "Experimental Android Kbase/CSF port from pinned Mesa and public patches, with the MediaTek linear-AHB usage behavior reconstructed from Faux123 1.1.9. Not byte-identical to Faux123 and not hardware-validated for BOTWRecomp.",
             "author": "Mesa/Panfrost contributors and public patch authors; see source provenance",
-            "packageVersion": "1.1.9-mc7-peanuts-wsi-ab",
+            "packageVersion": "1.1.9-mc7-wsi-import-check",
             "vendor": "Mesa",
             "driverVersion": "26.3.0-devel-port",
             "minApi": 29,
             "libraryName": "libvulkan_panfrost.so"
           }
           EOF
-          archive=PanVK-Faux123-1.1.9-G720-MC7-Peanuts-WSI-AB.adpkg.zip
+          archive=PanVK-Faux123-1.1.9-G720-MC7-WSI-Import-Check.adpkg.zip
           (cd dist/package && zip -q -9 "../$archive" libvulkan_panfrost.so meta.json)
           unzip -tq "dist/$archive"
           unzip -p "dist/$archive" meta.json | python3 -c 'import json,sys; assert json.load(sys.stdin)["libraryName"] == "libvulkan_panfrost.so"'
-          sha256sum dist/PanVK-Faux123-1.1.9-G720-MC7-Peanuts-WSI-AB.adpkg.zip dist/package/libvulkan_panfrost.so | tee dist/SHA256SUMS
+          sha256sum dist/PanVK-Faux123-1.1.9-G720-MC7-WSI-Import-Check.adpkg.zip dist/package/libvulkan_panfrost.so | tee dist/SHA256SUMS
           git -C source/work/mesa rev-parse HEAD > dist/mesa-head.txt
 
       - name: Upload test package and diagnostics
@@ -167,7 +167,7 @@ jobs:
         with:
           name: panvk-g720-mc7-test
           path: |
-            dist/PanVK-Faux123-1.1.9-G720-MC7-Peanuts-WSI-AB.adpkg.zip
+            dist/PanVK-Faux123-1.1.9-G720-MC7-WSI-Import-Check.adpkg.zip
             dist/SHA256SUMS
             dist/mesa-head.txt
             dist/elf-header.txt

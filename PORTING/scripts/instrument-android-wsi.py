@@ -12,7 +12,7 @@ replacements = [
       }""",
 """      int ahb_rc = AHardwareBuffer_allocate(&desc, &chain->images[i].ahb);
       if (ahb_rc != 0 || !chain->images[i].ahb) {
-         mesa_logi("panvk-wsi-diag: stage=ahb_allocate index=%u rc=%d ahb=%p extent=%ux%u format=%u usage=0x%llx",
+         mesa_loge("panvk-wsi-diag: stage=ahb_allocate index=%u rc=%d ahb=%p extent=%ux%u format=%u usage=0x%llx",
                    i, ahb_rc, chain->images[i].ahb, desc.width, desc.height,
                    desc.format, (unsigned long long)desc.usage);
          panvk_android_swapchain_destroy(&chain->base, pAllocator);
@@ -27,7 +27,7 @@ replacements = [
 
       VkAndroidHardwareBufferPropertiesANDROID ahb_props""",
 """      if (result != VK_SUCCESS) {
-         mesa_logi("panvk-wsi-diag: stage=create_image index=%u result=%d format=%u usage=0x%x extent=%ux%u",
+         mesa_loge("panvk-wsi-diag: stage=create_image index=%u result=%d format=%u usage=0x%x extent=%ux%u",
                    i, result, ici.format, ici.usage, ici.extent.width, ici.extent.height);
          panvk_android_swapchain_destroy(&chain->base, pAllocator);
          return result;
@@ -41,13 +41,20 @@ replacements = [
 
       uint32_t chosen_mi = 0;""",
 """      if (result != VK_SUCCESS) {
-         mesa_logi("panvk-wsi-diag: stage=ahb_properties index=%u result=%d ahb=%p",
+         mesa_loge("panvk-wsi-diag: stage=ahb_properties index=%u result=%d ahb=%p",
                    i, result, chain->images[i].ahb);
          panvk_android_swapchain_destroy(&chain->base, pAllocator);
          return result;
       }
       mesa_logi("panvk-wsi-diag: stage=ahb_properties index=%u result=0 allocation=%llu memoryTypeBits=0x%x",
                 i, (unsigned long long)ahb_props.allocationSize, ahb_props.memoryTypeBits);
+
+      if (!ahb_props.memoryTypeBits) {
+         mesa_loge("panvk-wsi-diag: stage=ahb_memory_types index=%u allocation=%llu memoryTypeBits=0\n",
+                   i, (unsigned long long)ahb_props.allocationSize);
+         panvk_android_swapchain_destroy(&chain->base, pAllocator);
+         return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+      }
 
       uint32_t chosen_mi = 0;"""),
 ("""      if (result != VK_SUCCESS) {
@@ -57,7 +64,7 @@ replacements = [
 
       VkBindImageMemoryInfo bmi""",
 """      if (result != VK_SUCCESS) {
-         mesa_logi("panvk-wsi-diag: stage=allocate_memory index=%u result=%d size=%llu memoryTypeIndex=%u",
+         mesa_loge("panvk-wsi-diag: stage=allocate_memory index=%u result=%d size=%llu memoryTypeIndex=%u",
                    i, result, (unsigned long long)mai.allocationSize, mai.memoryTypeIndex);
          panvk_android_swapchain_destroy(&chain->base, pAllocator);
          return result;
@@ -71,7 +78,7 @@ replacements = [
    }
    vk_android_set_owned_ahb(NULL);""",
 """      if (result != VK_SUCCESS) {
-         mesa_logi("panvk-wsi-diag: stage=bind_image_memory index=%u result=%d image=%p memory=%p",
+         mesa_loge("panvk-wsi-diag: stage=bind_image_memory index=%u result=%d image=%p memory=%p",
                    i, result, chain->images[i].base.image, chain->images[i].base.memory);
          panvk_android_swapchain_destroy(&chain->base, pAllocator);
          return result;
