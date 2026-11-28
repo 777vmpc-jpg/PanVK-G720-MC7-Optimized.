@@ -1,0 +1,59 @@
+--- a/src/vulkan/runtime/vk_android.c
++++ b/src/vulkan/runtime/vk_android.c
+@@ -228,12 +228,53 @@
+    VkResult result = device->dispatch_table.GetMemoryFdPropertiesKHR(
+       (VkDevice)device, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
+       dma_buf_fd, &fd_props);
++   uint32_t compatible_types = result == VK_SUCCESS
++      ? mem_reqs.memoryTypeBits & fd_props.memoryTypeBits : 0;
++
++   /* A MediaTek native handle can put an auxiliary gralloc fd first. Keep
++    * the existing first-fd path when it works. Only consider alternatives
++    * for the single-plane RGBA swapchain format, and verify they are dma-bufs. */
++   if (result == VK_ERROR_INVALID_EXTERNAL_HANDLE &&
++       anb->format == HAL_PIXEL_FORMAT_RGBA_8888) {
++      for (int i = 1; i < anb->handle->numFds; i++) {
++         const int fd = anb->handle->data[i];
++         char path[64], target[160];
++         if (fd < 0)
++            continue;
++         int len = snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
++         if (len <= 0 || (size_t)len >= sizeof(path))
++            continue;
++         ssize_t n = readlink(path, target, sizeof(target) - 1);
++         if (n < 0)
++            continue;
++         target[n] = '\0';
++         if (!strstr(target, "dmabuf") && !strstr(target, "dma_buf"))
++            continue;
++
++         fd_props.memoryTypeBits = 0;
++         VkResult candidate = device->dispatch_table.GetMemoryFdPropertiesKHR(
++            (VkDevice)device, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
++            fd, &fd_props);
++         if (candidate != VK_SUCCESS)
++            continue;
++
++         uint32_t types = mem_reqs.memoryTypeBits & fd_props.memoryTypeBits;
++         if (!types)
++            continue;
++
++         compatible_types = types;
++         dma_buf_fd = fd;
++         result = VK_SUCCESS;
++         mesa_logi("panvk-anb: using dma-buf FD[%d] after FD[0] failed", i);
++         break;
++      }
++   }
++
+    if (result != VK_SUCCESS) {
+-      mesa_loge("GetMemoryFdPropertiesKHR failed");
++      mesa_loge("panvk-anb: GetMemoryFdPropertiesKHR failed: %d (%d FDs)",
++                result, anb->handle->numFds);
+       return result;
+    }
+-
+-   uint32_t compatible_types = mem_reqs.memoryTypeBits & fd_props.memoryTypeBits;
+    if (!compatible_types) {
+       mesa_loge("No compatible AHB mem types (img_reqs=%#b,fd_reqs=%#b)",
+                  mem_reqs.memoryTypeBits, fd_props.memoryTypeBits);
